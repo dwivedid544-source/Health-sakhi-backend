@@ -539,7 +539,7 @@ const registerUser = async (data) => {
             planId: freePlan.id,
             status: 'ACTIVE',
             startsAt: new Date(),
-            endsAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+            endsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30-day free trial under Humanity Pricing
             autoRenew: false
           }
         });
