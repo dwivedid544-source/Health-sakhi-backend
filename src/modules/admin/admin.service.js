@@ -291,7 +291,9 @@ const updateUser = async (id, data, adminId) => {
 
   const oldValues = { phone: user.phone, isApproved: user.isApproved, isSuspended: user.isSuspended };
   const updateData = {};
-  if (data.phone !== undefined) updateData.phone = data.phone;
+  if (data.phone !== undefined) {
+    updateData.phone = data.phone && data.phone.trim() ? data.phone.trim() : null;
+  }
 
   // Map status string to boolean fields
   if (data.status !== undefined) {
@@ -312,14 +314,20 @@ const updateUser = async (id, data, adminId) => {
     });
 
     // Update profile fields
-    if (updated.profile && (data.fullName !== undefined || data.bio !== undefined)) {
+    if (data.fullName !== undefined || data.bio !== undefined) {
       const profileData = {};
-      if (data.fullName !== undefined) profileData.fullName = data.fullName;
+      if (data.fullName !== undefined) profileData.fullName = data.fullName.trim();
       if (data.bio !== undefined) profileData.bio = data.bio;
 
-      await tx.userProfile.update({
-        where: { id: updated.profile.id },
-        data: profileData
+      await tx.userProfile.upsert({
+        where: { userId: id },
+        create: {
+          userId: id,
+          fullName: data.fullName?.trim() || 'Member',
+          bio: data.bio || null,
+          lastActiveDate: new Date()
+        },
+        update: profileData
       });
     }
 
@@ -350,18 +358,24 @@ const updateUser = async (id, data, adminId) => {
     }
 
     // Write audit log entry
-    await tx.auditLog.create({
-      data: {
-        userId: adminId,
-        action: 'USER_UPDATE',
-        targetTable: 'users',
-        targetId: id,
-        changes: {
-          before: oldValues,
-          after: data
-        }
+    if (adminId) {
+      try {
+        await tx.auditLog.create({
+          data: {
+            userId: adminId,
+            action: 'USER_UPDATE',
+            targetTable: 'users',
+            targetId: id,
+            changes: {
+              before: oldValues,
+              after: data
+            }
+          }
+        });
+      } catch (logErr) {
+        logger.warn('Failed to record user update audit log:', logErr.message);
       }
-    });
+    }
 
     return tx.user.findUnique({
       where: { id },
